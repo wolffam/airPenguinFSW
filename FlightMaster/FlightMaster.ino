@@ -14,7 +14,7 @@
 // 2016-05-24/12:18 - V1.7 - Changes pins for Pyros and SmoxV
 // 2016-05-25/10:19 - V1.8 - Added abort capability for Flight1/Coast -- GROUND TEST ONLY
 // 2016-05-28/09:24 - V1.9 - Added abort capability for Recovery, lengthened pyro on times, allow for FVV in Recovery
-// 2017-02-12/10:08 - V2.0 - Modify towards relaunch (no QDsep)
+// 2017-02-12/10:08 - V2.0 - Modify towards relaunch (no QDsep, SMOXV)
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
@@ -61,14 +61,17 @@ int FVVCloseNum = 0;
 #define MOXV       4
 #define PYRO_1_PIN 5
 #define PYRO_2_PIN 6
-#define FVV_PIN    12
-#define WR_STATE   10
+#define FVV_PIN    7
 
-#define RD_LAUNCH     27
-#define RD_ABORT      28
-#define RD_ABORT_SOFT 29
-#define RD_FVV        30
+#define WR_STATE   12
 
+// DEFINE PINS FOR READING SIGNAL //
+#define RD_LAUNCH     8
+#define RD_ABORT      9
+#define RD_ABORT_SOFT 10
+#define RD_FVV        11
+
+// DEFINE PIN FOR WRITING ERROR TO DISPLAY
 #define WR_ERROR      31
   
 // DEFINE ACTIVE LOW RELAY CONFIG //
@@ -89,20 +92,14 @@ int initMillis = millis();
 int currentMillis = millis();
 
 void setup() {
-
+  Serial.begin(9600); // TODO: CAN THIS BE IN LAUNCH CODE???
 
   // SET INITIAL STATE TO CLOSE FOR ALL RELAYS //
-
   pinMode(MOXV, OUTPUT);
-  
   pinMode(PYRO_1_PIN, OUTPUT);
-  
   pinMode(PYRO_2_PIN, OUTPUT);
-  
   pinMode(FVV_PIN, OUTPUT);
-    
   pinMode(WR_STATE, OUTPUT);
-  
   pinMode(WR_ERROR, OUTPUT);
 
   digitalWrite(MOXV,RELAY_OFF);
@@ -111,7 +108,6 @@ void setup() {
   digitalWrite(FVV_PIN,RELAY_OFF);
   digitalWrite(WR_STATE,RELAY_OFF);
   digitalWrite(WR_ERROR,RELAY_OFF);
-
 
   // INITIALIZE READ PINS AS INPUTS //
   pinMode(RD_LAUNCH, INPUT);
@@ -138,7 +134,7 @@ void loop() {
   
   STATE = HardAbortCheck(); // CHECKS FOR HARD ABORT SIGNAL
   STATE = SoftAbortCheck(); // CHECKS FOR SOFT ABORT SIGNAL
-  //IF ABORT IS NOT IN EFFECT, CONFIRM THAT LAUNCH PIN HIGH LASTS A FULL SECOND //  
+  //IF ABORT IS NOT IN EFFECT, CONFIRM THAT LAUNCH PIN HIGH LASTS A TENTH OF A SECOND //  
   if (digitalRead(RD_LAUNCH) == HIGH && digitalRead(RD_ABORT) == LOW && STATE != 6){
 
     int currLaunchMillis = millis();
@@ -202,8 +198,6 @@ void loop() {
       Serial.println(STATE);
   }
 
-  
-
 }
 
 
@@ -229,13 +223,13 @@ int LaunchSeq(){
     STATE = HardAbortCheck();
     STATE = SoftAbortCheck();
     // NOTE: CANNOT ABORT OUT OF LAUNCH AT THIS POINT //
-    if ((currentMillis - initMillis) > 60000 && pyro1OpenCounter == 0 && STATE != 6){
+    if ((currentMillis - initMillis) > 20000 && pyro1OpenCounter == 0 && STATE != 6){
       digitalWrite(PYRO_1_PIN,RELAY_ON);
       pyro1OpenCounter = 1;  
     }
 
     // AFTER *60.3 SECONDS*, OPEN MAIN OX VALVE (1) //
-    if ((currentMillis - initMillis) > 60500 && moxv1OpenCounter == 0){
+    if ((currentMillis - initMillis) > 20500 && moxv1OpenCounter == 0){
       digitalWrite(MOXV,RELAY_ON);
       moxv1OpenCounter = 1;
       STATE = 2; // SET STATE TO FLIGHT_1
