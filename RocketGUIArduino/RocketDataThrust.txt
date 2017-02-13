@@ -1,0 +1,2 @@
+Thrust (lbs) Time (s) 
+ 
