@@ -14,6 +14,7 @@
 // 2016-05-24/12:18 - V1.7 - Changes pins for Pyros and SmoxV
 // 2016-05-25/10:19 - V1.8 - Added abort capability for Flight1/Coast -- GROUND TEST ONLY
 // 2016-05-28/09:24 - V1.9 - Added abort capability for Recovery, lengthened pyro on times, allow for FVV in Recovery
+// 2017-02-12/10:08 - V2.0 - Modify towards relaunch (no QDsep)
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
@@ -57,14 +58,10 @@ int FVVCloseNum = 0;
 ////////////////////
 
 // DEFINE PINS FOR ACTUATIONS //
-#define MOXV01_PIN 2
-#define MOXV02_PIN 3
-#define MOXV03_PIN 4
 #define PYRO_1_PIN 5
 #define PYRO_2_PIN 6
 #define SMOXV_PIN  9
 #define FVV_PIN    12
-#define QDSEP_PIN  11
 #define WR_STATE   10
 
 #define RD_LAUNCH     27
@@ -95,14 +92,6 @@ void setup() {
 
 
   // SET INITIAL STATE TO CLOSE FOR ALL RELAYS //
-
- 
-  
-  pinMode(MOXV01_PIN, OUTPUT);
-  
-  pinMode(MOXV02_PIN, OUTPUT);
-  
-  pinMode(MOXV03_PIN, OUTPUT);
   
   pinMode(SMOXV_PIN, OUTPUT);
   
@@ -111,21 +100,15 @@ void setup() {
   pinMode(PYRO_2_PIN, OUTPUT);
   
   pinMode(FVV_PIN, OUTPUT);
-  
-  pinMode(QDSEP_PIN, OUTPUT);
-  
+    
   pinMode(WR_STATE, OUTPUT);
   
   pinMode(WR_ERROR, OUTPUT);
 
-  digitalWrite(MOXV01_PIN,RELAY_OFF);
-  digitalWrite(MOXV02_PIN,RELAY_OFF);
-  digitalWrite(MOXV03_PIN,RELAY_OFF);
   digitalWrite(SMOXV_PIN,RELAY_OFF);
   digitalWrite(PYRO_1_PIN,RELAY_OFF);
   digitalWrite(PYRO_2_PIN,RELAY_OFF);
   digitalWrite(FVV_PIN,RELAY_OFF);
-  digitalWrite(QDSEP_PIN,RELAY_OFF);
   digitalWrite(WR_STATE,RELAY_OFF);
   digitalWrite(WR_ERROR,RELAY_OFF);
 
@@ -135,8 +118,6 @@ void setup() {
   pinMode(RD_ABORT,  INPUT);
   pinMode(RD_ABORT_SOFT, INPUT);
   pinMode(RD_FVV,  INPUT);
-
-  int MasterInitMillis = millis(); // CURRENTLY NOT USED
 
   analogWrite(WR_STATE,42.5*STATE);
 
@@ -251,17 +232,8 @@ int LaunchSeq(){
       break;
     }
     if ((currentMillis - initMillis) > 30000 && startSeqCounter == 0 && STATE != 6) {
-      digitalWrite(QDSEP_PIN,RELAY_ON);
       digitalWrite(SMOXV_PIN,RELAY_ON);  
       startSeqCounter = 1;
-    }
-
-    // AFTER *32 SECONDS*, CLOSE QDSEP RELAY //
-    STATE = HardAbortCheck();
-    STATE = SoftAbortCheck();
-    if ((currentMillis - initMillis) > 32000 && qdsepOffCounter == 0 && STATE != 6) {
-      digitalWrite(QDSEP_PIN,RELAY_OFF);
-      qdsepOffCounter = 1;
     }
 
     // AFTER *60 SECONDS*, FEED CURRENT TO PYRO 1 //
