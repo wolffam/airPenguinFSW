@@ -14,6 +14,7 @@
 // 2016-05-24/12:18 - V1.7 - Changes pins for Pyros and SmoxV
 // 2016-05-25/10:19 - V1.8 - Added abort capability for Flight1/Coast -- GROUND TEST ONLY
 // 2016-05-28/09:24 - V1.9 - Added abort capability for Recovery, lengthened pyro on times, allow for FVV in Recovery
+// 2017-02-12/10:08 - V2.0 - Modify towards relaunch (no QDsep, SMOXV)
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
@@ -57,21 +58,20 @@ int FVVCloseNum = 0;
 ////////////////////
 
 // DEFINE PINS FOR ACTUATIONS //
-#define MOXV01_PIN 2
-#define MOXV02_PIN 3
-#define MOXV03_PIN 4
+#define MOXV       4
 #define PYRO_1_PIN 5
 #define PYRO_2_PIN 6
-#define SMOXV_PIN  9
-#define FVV_PIN    12
-#define QDSEP_PIN  11
-#define WR_STATE   10
+#define FVV_PIN    7
 
-#define RD_LAUNCH     27
-#define RD_ABORT      28
-#define RD_ABORT_SOFT 29
-#define RD_FVV        30
+#define WR_STATE   12
 
+// DEFINE PINS FOR READING SIGNAL //
+#define RD_LAUNCH     8
+#define RD_ABORT      9
+#define RD_ABORT_SOFT 10
+#define RD_FVV        11
+
+// DEFINE PIN FOR WRITING ERROR TO DISPLAY
 #define WR_ERROR      31
   
 // DEFINE ACTIVE LOW RELAY CONFIG //
@@ -92,51 +92,28 @@ int initMillis = millis();
 int currentMillis = millis();
 
 void setup() {
-
+  Serial.begin(9600); // TODO: CAN THIS BE IN LAUNCH CODE???
 
   // SET INITIAL STATE TO CLOSE FOR ALL RELAYS //
-
- 
-  
-  pinMode(MOXV01_PIN, OUTPUT);
-  
-  pinMode(MOXV02_PIN, OUTPUT);
-  
-  pinMode(MOXV03_PIN, OUTPUT);
-  
-  pinMode(SMOXV_PIN, OUTPUT);
-  
+  pinMode(MOXV, OUTPUT);
   pinMode(PYRO_1_PIN, OUTPUT);
-  
   pinMode(PYRO_2_PIN, OUTPUT);
-  
   pinMode(FVV_PIN, OUTPUT);
-  
-  pinMode(QDSEP_PIN, OUTPUT);
-  
   pinMode(WR_STATE, OUTPUT);
-  
   pinMode(WR_ERROR, OUTPUT);
 
-  digitalWrite(MOXV01_PIN,RELAY_OFF);
-  digitalWrite(MOXV02_PIN,RELAY_OFF);
-  digitalWrite(MOXV03_PIN,RELAY_OFF);
-  digitalWrite(SMOXV_PIN,RELAY_OFF);
+  digitalWrite(MOXV,RELAY_OFF);
   digitalWrite(PYRO_1_PIN,RELAY_OFF);
   digitalWrite(PYRO_2_PIN,RELAY_OFF);
   digitalWrite(FVV_PIN,RELAY_OFF);
-  digitalWrite(QDSEP_PIN,RELAY_OFF);
   digitalWrite(WR_STATE,RELAY_OFF);
   digitalWrite(WR_ERROR,RELAY_OFF);
-
 
   // INITIALIZE READ PINS AS INPUTS //
   pinMode(RD_LAUNCH, INPUT);
   pinMode(RD_ABORT,  INPUT);
   pinMode(RD_ABORT_SOFT, INPUT);
   pinMode(RD_FVV,  INPUT);
-
-  int MasterInitMillis = millis(); // CURRENTLY NOT USED
 
   analogWrite(WR_STATE,42.5*STATE);
 
@@ -157,7 +134,7 @@ void loop() {
   
   STATE = HardAbortCheck(); // CHECKS FOR HARD ABORT SIGNAL
   STATE = SoftAbortCheck(); // CHECKS FOR SOFT ABORT SIGNAL
-  //IF ABORT IS NOT IN EFFECT, CONFIRM THAT LAUNCH PIN HIGH LASTS A FULL SECOND //  
+  //IF ABORT IS NOT IN EFFECT, CONFIRM THAT LAUNCH PIN HIGH LASTS A TENTH OF A SECOND //  
   if (digitalRead(RD_LAUNCH) == HIGH && digitalRead(RD_ABORT) == LOW && STATE != 6){
 
     int currLaunchMillis = millis();
@@ -221,8 +198,6 @@ void loop() {
       Serial.println(STATE);
   }
 
-  
-
 }
 
 
@@ -244,38 +219,18 @@ int LaunchSeq(){
     currentMillis = millis();
     WriteSD(); // WRITE TELEMETRY TO SD CARD
 
-    // AFTER *30 SECONDS*, ACTUAL QUICK DISCONNECT AND OPEN SAFETY VALVE //
-    STATE = HardAbortCheck();
-    STATE = SoftAbortCheck();
-    if (STATE != 1){
-      break;
-    }
-    if ((currentMillis - initMillis) > 30000 && startSeqCounter == 0 && STATE != 6) {
-      digitalWrite(QDSEP_PIN,RELAY_ON);
-      digitalWrite(SMOXV_PIN,RELAY_ON);  
-      startSeqCounter = 1;
-    }
-
-    // AFTER *32 SECONDS*, CLOSE QDSEP RELAY //
-    STATE = HardAbortCheck();
-    STATE = SoftAbortCheck();
-    if ((currentMillis - initMillis) > 32000 && qdsepOffCounter == 0 && STATE != 6) {
-      digitalWrite(QDSEP_PIN,RELAY_OFF);
-      qdsepOffCounter = 1;
-    }
-
     // AFTER *60 SECONDS*, FEED CURRENT TO PYRO 1 //
     STATE = HardAbortCheck();
     STATE = SoftAbortCheck();
     // NOTE: CANNOT ABORT OUT OF LAUNCH AT THIS POINT //
-    if ((currentMillis - initMillis) > 60000 && pyro1OpenCounter == 0 && STATE != 6){
+    if ((currentMillis - initMillis) > 20000 && pyro1OpenCounter == 0 && STATE != 6){
       digitalWrite(PYRO_1_PIN,RELAY_ON);
       pyro1OpenCounter = 1;  
     }
 
     // AFTER *60.3 SECONDS*, OPEN MAIN OX VALVE (1) //
-    if ((currentMillis - initMillis) > 60500 && moxv1OpenCounter == 0){
-      digitalWrite(MOXV01_PIN,RELAY_ON);
+    if ((currentMillis - initMillis) > 20500 && moxv1OpenCounter == 0){
+      digitalWrite(MOXV,RELAY_ON);
       moxv1OpenCounter = 1;
       STATE = 2; // SET STATE TO FLIGHT_1
       LaunchSeqEnd = 1; // END WHILE LOOP
@@ -310,7 +265,7 @@ int Flight1Seq(){
     /////////////////////////////
 
     if ((currentMillis - initMillis) > 1000 && moxv1OffCounter == 0){
-      digitalWrite(MOXV01_PIN,RELAY_OFF);
+      digitalWrite(MOXV,RELAY_OFF);
       moxv1OffCounter = 1;
     }
 
@@ -331,7 +286,7 @@ int Flight1Seq(){
     /////////////////////////////
 
     if ((currentMillis - initMillis) > 7000 && Burn1Counter == 0){
-      digitalWrite(MOXV02_PIN,RELAY_ON);
+      digitalWrite(MOXV,RELAY_ON);
       Burn1Counter = 1;
       STATE = 3; // SET STATE TO COAST
       Flight1SeqEnd = 1;
@@ -364,7 +319,7 @@ int CoastSeq(){
 
     
     if ((currentMillis - initMillis) > 1000 && moxv2OffCounter == 0){
-      digitalWrite(MOXV02_PIN,RELAY_OFF);
+      digitalWrite(MOXV,RELAY_OFF);
       moxv2OffCounter = 1;
     }
 
@@ -388,8 +343,6 @@ int CoastSeq(){
 
 // FLIGHT_2 SEQUENCING FUNCTION //
 int Flight2Seq(){
-
-  
 
   initMillis = millis();
   int Flight2SeqEnd = 0;
@@ -415,7 +368,7 @@ int Flight2Seq(){
     }
 
     if ((currentMillis - initMillis) > 500 && moxv3OpenCounter == 0){
-      digitalWrite(MOXV03_PIN,RELAY_ON);
+      digitalWrite(MOXV,RELAY_ON);
       moxv3OpenCounter = 1;
     }
 
@@ -426,7 +379,7 @@ int Flight2Seq(){
 
 
     if ((currentMillis - initMillis) > 1000 && moxv3OffCounter == 0){
-      digitalWrite(MOXV03_PIN,RELAY_OFF);
+      digitalWrite(MOXV,RELAY_OFF);
       moxv3OffCounter = 1;
     }
 
@@ -508,8 +461,6 @@ void SafeSeq(){
 
     if (FVVOpenNum == FVVCloseNum){
 
-
-      digitalWrite(SMOXV_PIN,RELAY_OFF);      
       digitalWrite(FVV_PIN,RELAY_ON);
       FVVOpenNum += 1;
       SafeSeqEnd = 1;
@@ -572,7 +523,6 @@ int SoftAbortCheck(){
     }
     if (falseAbortSoftPinRead == 0){
 
-      digitalWrite(SMOXV_PIN,RELAY_OFF);
       STATE = 0; // SEND STATE TO PRELAUNCH
     }
   }
